@@ -1,67 +1,33 @@
 package main
 
 import (
-	"fmt"
-	"log"
-	"os"
-	"time"
-
 	"github.com/gempir/go-twitch-irc/v2"
-	"github.com/joho/godotenv"
-	bot "github.com/lyx0/nourybot-go/bot"
-	cmd "github.com/lyx0/nourybot-go/commands"
-	"github.com/lyx0/nourybot-go/common"
-	"github.com/lyx0/nourybot-go/modules"
+	"github.com/lyx0/nourybot-go/bot"
+	"github.com/lyx0/nourybot-go/config"
+	"github.com/lyx0/nourybot-go/db"
+	log "github.com/sirupsen/logrus"
 )
 
 func main() {
-	log.Println("Starting")
+	// Load config containing client configurations
+	cfg := config.LoadConfig()
 
-	envErr := godotenv.Load()
-	if envErr != nil {
-		log.Fatal("Error loading .env file")
-	}
-	botUser := os.Getenv("TWITCH_USER")
-	botPass := os.Getenv("TWITCH_PASSWORD")
+	// Create a new twitch client with parameters specified from
+	// the config module
+	twitchClient := twitch.NewClient(cfg.Username, cfg.Oauth)
 
-	bot.Nourybot = &bot.Bot{
-		Client: twitch.NewClient(botUser, botPass),
-		// Channels: channels,
-		Uptime: time.Now(),
-	}
-
-	bot.Nourybot.Client.OnPrivateMessage(func(message twitch.PrivateMessage) {
-		// If channelID is missing something must have gone wrong.
-		channelID := message.Tags["room-id"]
-		if channelID == "" {
-			fmt.Printf("Missing room-id tag in message")
-			return
-		}
-
-		// So that the bot doesn't repeat itself.
-		if message.Tags["user-id"] == "596581605" {
-			return
-		}
-
-		// fmt.Printf("%v\n", message.Message)
-		// fmt.Print(message.User.Badges)
-		cmd.HandleMessage(message, bot.Nourybot)
-
-	})
-
-	// Connect to MySQL database
-	sqlClient := modules.Connect()
+	// Create a new sql connection
+	sqlClient := db.Connect(cfg)
 	defer sqlClient.Close()
 
-	// Get each channel from database and join them
-	common.JoinChannels(sqlClient)
-	// Get a set of channels where we should announce when we join
-	common.AnnounceJoin(sqlClient)
-	// Connect to Twitch chat
-	err := bot.Nourybot.Client.Connect()
+	// Create New Bot with twitch client and
+	// config and connect to chat
+	bot := bot.NewBot(cfg, twitchClient, sqlClient)
 
+	// Connect
+	err := bot.Connect()
 	if err != nil {
-		log.Fatalln(err.Error())
+		log.Fatal("Couldn't establish connection", err)
 	}
 
 }

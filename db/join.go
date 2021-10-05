@@ -1,26 +1,26 @@
-package common
+package db
 
 import (
 	"database/sql"
-	"fmt"
 
-	"github.com/lyx0/nourybot-go/bot"
+	twitch "github.com/gempir/go-twitch-irc/v2"
+	log "github.com/sirupsen/logrus"
 )
 
 // JoinChannels queries a given db *sql.DB database for a
 // list of channels which we should join.
-func JoinChannels(db *sql.DB) error {
-	fmt.Println("Getting channels to join...")
+func JoinChannels(tc *twitch.Client, db *sql.DB) error {
+	log.Info("Getting channels to join...")
 
 	rows, err := db.Query("SELECT `Name` FROM `nouryqt_nourybot`.`connectchannels`")
 	if err != nil {
-		panic(err.Error())
+		log.Fatal(err)
 	}
 
 	// Get column names
 	cols, err := rows.Columns()
 	if err != nil {
-		panic(err.Error())
+		log.Fatal(err)
 	}
 
 	// Make a slice for the values
@@ -36,7 +36,7 @@ func JoinChannels(db *sql.DB) error {
 		// Get RawBytes from data
 		err = rows.Scan(scanArgs...)
 		if err != nil {
-			panic(err.Error())
+			log.Fatal(err)
 		}
 
 		var channel string
@@ -47,8 +47,9 @@ func JoinChannels(db *sql.DB) error {
 				channel = string(col)
 			}
 		}
-		bot.Nourybot.Client.Join(channel)
-		fmt.Printf("Joined: #%s\n", channel)
+		tc.Join(channel)
+		// bot.Nourybot.Client.Join(channel)
+		log.Info("Joined: #%s", channel)
 	}
 	return nil
 }
